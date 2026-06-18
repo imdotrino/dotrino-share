@@ -1,0 +1,37 @@
+{
+  "name": "@dotrino/share",
+  "version": "0.3.0",
+  "description": "UI compartida de Dotrino para compartir un enlace: Web Component <dotrino-share> con QR autohosteado, copiar y botones de redes (WhatsApp/Telegram/X/Facebook/Web Share). Emite cc-share-shared y soporta el opt-in de acuse de apertura (track + .notifications). Shadow DOM, sin JS de terceros ni cookies, bilingüe es/en. La misma para todas las apps del ecosistema.",
+  "type": "module",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "./src/index.js"
+  ],
+  "dependencies": {
+    "qrcode": "1.5.4"
+  },
+  "keywords": [
+    "dotrino",
+    "share",
+    "qr",
+    "web-component",
+    "social"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imdotrino/dotrino-share.git"
+  }
+}
