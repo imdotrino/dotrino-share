@@ -1,5 +1,7 @@
 # @dotrino/share
 
+> **Parte del ecosistema [Dotrino](https://dotrino.com).** Misión: aplicaciones que resuelven problemas comunes, respetando tu privacidad — sin anuncios, sin cookies, sin rastreo de datos, sin vender tu identidad a nadie.
+
 UI compartida del ecosistema **Dotrino** para **compartir un enlace**. Web
 Component `<dotrino-share>` (custom element, Shadow DOM) reutilizable por
 cualquier app (Vue o vanilla): el **mismo** modal de compartir para pronosticador,
