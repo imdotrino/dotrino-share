@@ -24,7 +24,7 @@
  * Atributos/propiedades: url, text, lang ('es'|'en'), heading, hint, open (bool).
  * Evento: 'cc-share-close' (al cerrar). Tema: variables CSS --ccs-* (ver abajo).
  */
-import QRCode from 'qrcode'
+import { qrSvg } from '@dotrino/qr/svg'
 
 const I18N = {
   es: {
@@ -79,7 +79,8 @@ const CSS = `
   }
   h3 { margin: 0 0 .3rem; font-size: 1.15rem; color: var(--ccs-accent, #cda350); }
   .hint { font-size: .82rem; color: var(--ccs-muted, #9a9a9a); margin: 0 0 1rem; }
-  .qr { width: 220px; height: 220px; max-width: 100%; border-radius: 8px; background: #fff; padding: 6px; box-sizing: border-box; }
+  .qr { width: 220px; height: 220px; max-width: 100%; border-radius: 8px; background: #fff; padding: 6px; box-sizing: border-box; margin: 0 auto; line-height: 0; }
+  .qr svg { display: block; width: 100%; height: 100%; }
   .qr-ph { width: 220px; height: 220px; max-width: 100%; border-radius: 8px; background: var(--ccs-bg-2, #2a2a2c); display: inline-block; }
   .url-row { display: flex; gap: .4rem; margin-top: .8rem; }
   .url-row input {
@@ -168,13 +169,17 @@ class DotrinoShare extends HTMLElement {
   get _t () { return I18N[this._lang] }
   get _shareText () { return this._text || this.getAttribute('text') || this._t.text }
 
-  async _genQR () {
+  // El QR sale del pilar (@dotrino/qr), como SVG: síncrono y sin canvas.
+  _genQR () {
     const url = this._url
     if (!url) { this._qr = ''; return }
     try {
-      const data = await QRCode.toDataURL(url, { margin: 1, width: 320, errorCorrectionLevel: 'M' })
-      if (url === this._url) { this._qr = data; this._render() }
-    } catch (_) { this._qr = ''; this._render() }
+      this._qr = qrSvg(url, { ecc: 'M', margin: 1 })
+    } catch (e) {
+      // Solo pasa si el enlace no cabe en un QR: se dice, no se pinta medio QR.
+      this._qr = ''
+      console.error('[dotrino-share] could not render the QR:', e?.message || e)
+    }
   }
 
   _close () { this.removeAttribute('open'); this.dispatchEvent(new CustomEvent('cc-share-close', { bubbles: true, composed: true })) }
@@ -257,7 +262,7 @@ class DotrinoShare extends HTMLElement {
           <button class="close" data-act="close" aria-label="${t.close}">&times;</button>
           <h3>${heading}</h3>
           <p class="hint">${hint}</p>
-          ${this._qr ? `<img class="qr" src="${this._qr}" alt="QR" />` : '<span class="qr-ph"></span>'}
+          ${this._qr ? `<div class="qr" role="img" aria-label="QR">${this._qr}</div>` : '<span class="qr-ph"></span>'}
           <div class="url-row">
             <input type="text" readonly value="${(this._url || '').replace(/"/g, '&quot;')}" data-act="select" />
             <button class="copy" data-act="copy">${this._copied ? t.copied : t.copy}</button>
