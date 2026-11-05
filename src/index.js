@@ -127,6 +127,17 @@ const CSS = `
   .switch.on .knob { transform: translateX(18px); }
 `
 
+/**
+ * Lo que `<dotrino-share>` usa del controlador de `createNotifications(...)`
+ * (`@dotrino/notifications`): leer y cambiar una categoría, y pedir permiso.
+ * @typedef {object} ShareNotifications
+ * @property {(category: string) => boolean | null | undefined} get
+ * @property {(category: string, on: boolean) => unknown} [set]
+ * @property {() => Promise<unknown>} [requestPermission]
+ */
+
+/** @typedef {'copy' | 'wa' | 'tg' | 'x' | 'fb' | 'native'} ShareMethod */
+
 class DotrinoShare extends HTMLElement {
   static get observedAttributes () { return ['url', 'text', 'lang', 'heading', 'hint', 'open', 'track', 'category'] }
 
@@ -137,13 +148,16 @@ class DotrinoShare extends HTMLElement {
     this._text = ''
     this._qr = ''
     this._copied = false
+    /** @type {ShareNotifications | null} */
     this._notifications = null   // controlador opcional (createNotifications) para el toggle de seguimiento
+    /** @param {KeyboardEvent} e */
     this._onKey = (e) => { if (e.key === 'Escape' && this._isOpen) this._close() }
   }
 
   connectedCallback () { this._render(); document.addEventListener('keydown', this._onKey) }
   disconnectedCallback () { document.removeEventListener('keydown', this._onKey) }
 
+  /** @param {string} name */
   attributeChangedCallback (name) {
     if (name === 'url') { this._url = this.getAttribute('url') || ''; this._genQR() }
     if (name === 'text') this._text = this.getAttribute('text') || ''
@@ -152,15 +166,25 @@ class DotrinoShare extends HTMLElement {
   }
 
   /* ----- propiedades (para frameworks que setean props, no atributos) ----- */
+  /** @param {string} v */
   set url (v) { this._url = v || ''; this.setAttribute('url', this._url) }
+  /** @returns {string} */
   get url () { return this._url }
+  /** @param {string} v */
   set text (v) { this._text = v || ''; if (v != null) this.setAttribute('text', v) }
+  /** @returns {string} */
   get text () { return this._text }
+  /** @param {boolean} v */
   set open (v) { if (v) this.setAttribute('open', ''); else this.removeAttribute('open') }
+  /** @returns {boolean} */
   get open () { return this._isOpen }
 
-  /** Controlador opcional de createNotifications(...): habilita el toggle "avísame cuando lo abran". */
+  /**
+   * Controlador opcional de createNotifications(...): habilita el toggle "avísame cuando lo abran".
+   * @param {ShareNotifications | null} c
+   */
   set notifications (c) { this._notifications = c || null; this._render() }
+  /** @returns {ShareNotifications | null} */
   get notifications () { return this._notifications }
 
   get _isOpen () { return this.hasAttribute('open') }
@@ -178,7 +202,7 @@ class DotrinoShare extends HTMLElement {
     } catch (e) {
       // Solo pasa si el enlace no cabe en un QR: se dice, no se pinta medio QR.
       this._qr = ''
-      console.error('[dotrino-share] could not render the QR:', e?.message || e)
+      console.error('[dotrino-share] could not render the QR:', /** @type {Error} */ (e)?.message || e)
     }
   }
 
@@ -186,6 +210,7 @@ class DotrinoShare extends HTMLElement {
 
   // Avisa al llamador que el usuario efectivamente compartió (copiar/red/nativo).
   // Permite a la app registrar el seguimiento del contenido compartido.
+  /** @param {ShareMethod} method */
   _emitShared (method) {
     this.dispatchEvent(new CustomEvent('cc-share-shared', {
       detail: { url: this._url, method }, bubbles: true, composed: true,
@@ -202,15 +227,19 @@ class DotrinoShare extends HTMLElement {
     this._emitShared('copy')
   }
 
+  /** @param {string} text */
   _copyFallback (text) {
     try {
       const ta = document.createElement('textarea')
       ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'
-      this.shadowRoot.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove()
+      const root = /** @type {ShadowRoot} */ (this.shadowRoot)
+      root.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove()
     } catch (_) { /* sin portapapeles */ }
   }
 
+  /** @param {string} href */
   _openWin (href) { window.open(href, '_blank', 'noopener') }
+  /** @param {string | null} key */
   _shareTo (key) {
     const u = encodeURIComponent(this._url)
     const text = encodeURIComponent(this._shareText)
@@ -219,7 +248,7 @@ class DotrinoShare extends HTMLElement {
     else if (key === 'x') this._openWin(`https://twitter.com/intent/tweet?text=${text}&url=${u}`)
     else if (key === 'fb') this._openWin(`https://www.facebook.com/sharer/sharer.php?u=${u}`)
     else if (key === 'more') { this._shareNative(); return }
-    this._emitShared(key)
+    this._emitShared(/** @type {ShareMethod} */ (key))
   }
   async _shareNative () {
     if (typeof navigator.share === 'function') {
@@ -240,13 +269,13 @@ class DotrinoShare extends HTMLElement {
   }
 
   _render () {
-    const root = this.shadowRoot
+    const root = /** @type {ShadowRoot} */ (this.shadowRoot)  // abierta en el constructor
     if (!this._isOpen) { root.innerHTML = '' ; return }
     const t = this._t
     const heading = this.getAttribute('heading') || t.heading
     const hint = this.getAttribute('hint') || t.hint
     const showTrack = this.hasAttribute('track') && this._notifications
-    const trackOn = showTrack && this._notifications.get(this._category) !== false
+    const trackOn = showTrack && this._notifications?.get(this._category) !== false
     const trackRow = showTrack ? `
           <div class="track">
             <div class="track-text">
@@ -279,10 +308,12 @@ class DotrinoShare extends HTMLElement {
           ${trackRow}
         </div>
       </div>`
-    root.querySelector('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) this._close() })
-    root.querySelector('[data-act="close"]').addEventListener('click', () => this._close())
-    root.querySelector('[data-act="copy"]').addEventListener('click', () => this._copy())
-    const inp = root.querySelector('[data-act="select"]'); inp.addEventListener('focus', () => inp.select())
+    // Los nodos de abajo los acaba de escribir el innerHTML de arriba: existen.
+    const $ = (/** @type {string} */ sel) => /** @type {HTMLElement} */ (root.querySelector(sel))
+    $('.overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) this._close() })
+    $('[data-act="close"]').addEventListener('click', () => this._close())
+    $('[data-act="copy"]').addEventListener('click', () => this._copy())
+    const inp = /** @type {HTMLInputElement} */ ($('[data-act="select"]')); inp.addEventListener('focus', () => inp.select())
     root.querySelectorAll('[data-share]').forEach(b => b.addEventListener('click', () => this._shareTo(b.getAttribute('data-share'))))
     const trackBtn = root.querySelector('[data-act="track"]'); if (trackBtn) trackBtn.addEventListener('click', () => this._toggleTrack())
   }
